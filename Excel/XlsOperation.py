@@ -8,8 +8,10 @@ sys.setdefaultencoding('utf-8')
 # sys.path.append('/Users/hsu-wei-cheng/common_lib/python')
 #standard lib
 import argparse
-import pprint
+import pprint as pp
 import re
+import traceback
+from awesome_print import ap
 import os
 import time
 import string
@@ -18,13 +20,12 @@ from pprint import pprint
 from timeit import default_timer as timer
 #3rd part lib
 #load custom library (remember to set PYTHONPATH in your .bashrc)
-from color_print import *
-from debug_tool import *
 import xlrd
 import xlwt
 from xlutils.copy import copy as xlscopy
-# from __future__ import division # division
 from collections import OrderedDict
+import datetime
+
 
 class ConvertHelper():
     def get_xy_range(self, start, end):
@@ -165,6 +166,7 @@ class StyleHelper():
 class ReadWrite(ConvertHelper):
     """docstring for XLS"""
 
+
     def wt_a_row(self, sht, i_row, val_lst,style=None):
         try:
             for cnt, val in enumerate(val_lst):
@@ -231,15 +233,39 @@ class ReadWrite(ConvertHelper):
             
         return str(val).strip()
 
+    def convert_date(self, value):
+        try:
+            date = [ str(item) for item in xlrd.xldate_as_tuple(value, self.rd_bk.datemode)[0:3] ]
+            return "/".join(date)
+        except BaseException  as e:
+            traceback.print_exc(file=sys.stdout)
+            raise e
+
+
+    
     def get_cell(self, sht, row, col):
         try:
             # c_type #放在之後再去想要怎麼去檢查check,嘗試轉成int -> float -> string
+            if row >= sht.nrows or col >= sht.ncols:
+                # print("Excced mac rows or cols")
+                return ''
             c_type = sht.cell(row, col).ctype
-            c_val = sht.cell_value(row, col)
-            try:
-                c_val = float(c_val)
-            except:
-                    c_val = str(c_val)
+
+            if xlrd.XL_CELL_DATE == c_type :
+                return self.convert_date(sht.cell_value(row, col))
+            elif xlrd.XL_CELL_NUMBER == c_type:
+                return float(sht.cell_value(row, col))
+            elif xlrd.XL_CELL_TEXT == c_type:
+                return str(sht.cell_value(row, col))
+            elif xlrd.XL_CELL_BLANK == c_type:
+                return ''
+            elif xlrd.XL_CELL_EMPTY == c_type:
+                return ''
+            else:
+                try:
+                    c_val = float(c_val)
+                except:
+                        c_val = str(c_val)
 
             return c_val
 
@@ -250,23 +276,26 @@ class ReadWrite(ConvertHelper):
             sys.exit(e) 
             raise e 
 
-    def get_str(self, cell_pos):
+    
+    def get_str(self,
+                 sht,
+                row, 
+                col):
         try:
-            row, col = self.get_xy(cell_pos)
-            val =  str(self.sht.cell_value(row, col)).lstrip("'").rstrip("'")
-            return val.strip() if val else None
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print("[Error]\n", exc_type, fname, exc_tb.tb_lineno)
-            sys.exit(e)
-            raise e
+            val =  str(sht.cell_value(row, col)).lstrip("'").rstrip("'")
+            return val.strip() if val else ''
+        except BaseException  as e:
+            # traceback.print_exc(file=sys.stdout)
+            return ''
 
-    def get_num(self,cell_pos):
+    def get_num(self,
+                sht,
+                row,
+                col):
         try:
-            row, col = self.get_xy(cell_pos)
+            pass
             try:
-                val =  abs(float(self.sht.cell_value(row, col)))
+                val =  abs(float(sht.cell_value(row, col)))
             except:
                 val = None
 
